@@ -48,7 +48,11 @@ class CognitoIdentityId {
         service: 'AWSCognitoIdentityService',
         endpoint: 'https://cognito-identity.$_region.amazonaws.com/');
 
-    this.identityId = data['IdentityId'];
+    // use regex until Dart AOT compiler is fixed.
+    final regExp = RegExp(r'[\w-]+:[0-9a-f-]+');
+    this.identityId = regExp.stringMatch(data.toString()).toString();
+//    this.identityId = data['IdentityId'];
+
     await _pool.storage.setItem(_identityIdKey, this.identityId);
 
     return this.identityId;
