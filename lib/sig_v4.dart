@@ -152,7 +152,9 @@ class SigV4 {
   }
 
   static String buildCanonicalUri(String uri) {
-    return Uri.encodeFull(uri);
+    uri = Uri.encodeFull(uri);
+    uri = uri.replaceAll(':', '%3A');
+    return uri;
   }
 
   static String buildCanonicalQueryString(Map<String, String> queryParams) {
