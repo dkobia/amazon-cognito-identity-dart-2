@@ -294,6 +294,18 @@ class CognitoUser {
     return username;
   }
 
+  /// Returns the cached key for this device. Device keys are stored in local storage and are used to track devices.
+  /// Returns `null` if no device key was cached.
+  Future<String> getDeviceKey() async {
+    // Return device key if it has been loaded or updated
+    if (_deviceKey != null) {
+      return _deviceKey;
+    }
+    // Otherwise, load from local storage
+    await getCachedDeviceKeyAndPassword();
+    return _deviceKey;
+  }
+
   String getAuthenticationFlowType() {
     return authenticationFlowType;
   }
@@ -303,7 +315,7 @@ class CognitoUser {
     this.authenticationFlowType = authenticationFlowType;
   }
 
-  void getCachedDeviceKeyAndPassword() async {
+  Future<void> getCachedDeviceKeyAndPassword() async {
     final keyPrefix =
         'CognitoIdentityServiceProvider.${pool.getClientId()}.$username';
     final deviceKeyKey = '$keyPrefix.deviceKey';
@@ -370,7 +382,7 @@ class CognitoUser {
     final dateNow = dateHelper.getNowString();
 
     final signature = Hmac(sha256, hkdf);
-    final signatureData = [];
+    final signatureData = <int>[];
     signatureData
       ..addAll(utf8.encode(_deviceGroupKey))
       ..addAll(utf8.encode(_deviceKey))
@@ -495,7 +507,7 @@ class CognitoUser {
       pool.getUserPoolId().split('_')[1],
     );
 
-    getCachedDeviceKeyAndPassword();
+    await getCachedDeviceKeyAndPassword();
     if (_deviceKey != null) {
       authParameters['DEVICE_KEY'] = _deviceKey;
     }
@@ -527,7 +539,7 @@ class CognitoUser {
     BigInt salt;
 
     final authParameters = {};
-    getCachedDeviceKeyAndPassword();
+    await getCachedDeviceKeyAndPassword();
     if (_deviceKey != null) {
       authParameters['DEVICE_KEY'] = _deviceKey;
     }
@@ -726,7 +738,7 @@ class CognitoUser {
     final authenticationHelper =
         AuthenticationHelper(pool.getUserPoolId().split('_')[1]);
 
-    getCachedDeviceKeyAndPassword();
+    await getCachedDeviceKeyAndPassword();
     if (_deviceKey != null) {
       challengeResponses['DEVICE_KEY'] = _deviceKey;
     }
@@ -772,7 +784,7 @@ class CognitoUser {
     final authenticationHelper =
         AuthenticationHelper(pool.getUserPoolId().split('_')[1]);
 
-    getCachedDeviceKeyAndPassword();
+    await getCachedDeviceKeyAndPassword();
     if (_deviceKey != null) {
       challengeResponses['DEVICE_KEY'] = _deviceKey;
     }
@@ -804,7 +816,7 @@ class CognitoUser {
       challengeResponses['SOFTWARE_TOKEN_MFA_CODE'] = confirmationCode;
     }
 
-    getCachedDeviceKeyAndPassword();
+    await getCachedDeviceKeyAndPassword();
     if (_deviceKey != null) {
       challengeResponses['DEVICE_KEY'] = _deviceKey;
     }
@@ -934,6 +946,20 @@ class CognitoUser {
     return true;
   }
 
+  /// This is used by an authenticated user to get the MFAOptions
+  Future<List> getMFAOptions() async {
+    if (!(_signInUserSession != null && _signInUserSession.isValid())) {
+      throw Exception('User is not authenticated');
+    }
+
+    final paramsReq = {
+      'AccessToken': _signInUserSession.getAccessToken().getJwtToken(),
+    };
+    final userData = await client.request('GetUser', paramsReq);
+
+    return userData['MFAOptions'];
+  }
+
   /// This is used to initiate a forgot password request
   Future forgotPassword() async {
     final paramsReq = {
@@ -1061,7 +1087,7 @@ class CognitoUser {
   }
 
   /// This is used by authenticated users to change a list of attributes
-  void updateAttributes(List<CognitoUserAttribute> attributes) async {
+  Future<bool> updateAttributes(List<CognitoUserAttribute> attributes) async {
     if (_signInUserSession == null || !_signInUserSession.isValid()) {
       throw Exception('User is not authenticated');
     }
@@ -1071,10 +1097,12 @@ class CognitoUser {
       'UserAttributes': attributes,
     };
     await client.request('UpdateUserAttributes', paramsReq);
+
+    return true;
   }
 
   /// This is used by an authenticated user to delete a list of attributes
-  void deleteAttributes(List<String> attributeList) async {
+  Future<bool> deleteAttributes(List<String> attributeList) async {
     if (!(_signInUserSession != null && _signInUserSession.isValid())) {
       throw Exception('User is not authenticated');
     }
@@ -1084,6 +1112,8 @@ class CognitoUser {
       'UserAttributeNames': attributeList,
     };
     await client.request('DeleteUserAttributes', paramsReq);
+
+    return true;
   }
 
   /// This is used by an authenticated user to delete him/herself
