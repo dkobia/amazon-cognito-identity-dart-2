@@ -426,16 +426,28 @@ class CognitoUser {
   /// This is used for authenticating the user through the custom authentication flow.
   Future<CognitoUserSession> initiateAuth(
       AuthenticationDetails authDetails) async {
+
+    final authenticationHelper = AuthenticationHelper(
+      pool.getUserPoolId().split('_')[1],
+    );
+
     final authParameters =
         authDetails.getAuthParameters().fold({}, (value, element) {
       value[element.name] = element.value;
       return value;
     });
     authParameters['USERNAME'] = username;
+    if (_deviceKey != null) {
+      authParameters['DEVICE_KEY'] = _deviceKey;
+    }
 
     if (_clientSecretHash != null) {
       authParameters['SECRET_HASH'] = _clientSecretHash;
     }
+
+    final srpA = authenticationHelper.getLargeAValue();
+    authParameters['SRP_A'] = srpA.toRadixString(16);
+    authParameters['CHALLENGE_NAME'] = 'SRP_A';
 
     final paramsReq = {
       'AuthFlow': 'CUSTOM_AUTH',
